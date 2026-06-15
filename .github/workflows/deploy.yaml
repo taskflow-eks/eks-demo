@@ -1,0 +1,49 @@
+name: Deploy EKS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+  EKS_CLUSTER: eks-demo-cluster
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Frontend
+        run: |
+          docker build -t $ECR_REGISTRY/eks-demo-frontend:${{ github.sha }} ./frontend
+          docker push $ECR_REGISTRY/eks-demo-frontend:${{ github.sha }}
+
+      - name: Build & Push Backend
+        run: |
+          docker build -t $ECR_REGISTRY/demo-backend:${{ github.sha }} ./backend
+          docker push $ECR_REGISTRY/demo-backend:${{ github.sha }}
+
+      - name: Upadte kubeconfig
+        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+
+      - name: Deploy to EKS
+        run: |
+          kubectl set image deployment/demo-frontend \
+            demo-frontend=$ECR_REGISTRY/demo-frontend:${{ github.sha }} -n eks-demo
+          kubectl set image deployment/demo-backend \
+            demo-backend=$ECR_REGISTRY/demo-backend:${{ github.sha }} -n eks-demo
