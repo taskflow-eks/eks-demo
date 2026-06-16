@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: eks-demo-frontend-svc
-  namespace: eks-demo
+  namespace: demo-eks
 spec:
   selector:
     app: demo-frontend

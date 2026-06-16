@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: demo-backend
-  namespace: eks-demo
+  namespace: demo-eks
 spec:
   replicas: 2
   selector:
@@ -20,7 +20,7 @@ spec:
             - containerPort: 5000
           env:
             - name: DB_SECRET_NAME
-              value: "eks-demo/db-credentials"
+              value: "eks-demo"
             - name: AWS_REGION
               value: "ap-northeast-2"
           resources:
