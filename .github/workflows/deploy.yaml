@@ -43,7 +43,5 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          kubectl set image deployment/demo-frontend \
-            demo-frontend=$ECR_REGISTRY/demo-frontend:${{ github.sha }} -n eks-demo
-          kubectl set image deployment/demo-backend \
-            demo-backend=$ECR_REGISTRY/demo-backend:${{ github.sha }} -n eks-demo
+          sed -i "s|:latest|:${{ github.sha }}|g" k8s/*.yaml
+          kubectl apply -f k8s/
