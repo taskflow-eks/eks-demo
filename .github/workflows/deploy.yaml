@@ -30,8 +30,8 @@ jobs:
 
       - name: Build & Push Frontend
         run: |
-          docker build -t $ECR_REGISTRY/eks-demo-frontend:${{ github.sha }} ./frontend
-          docker push $ECR_REGISTRY/eks-demo-frontend:${{ github.sha }}
+          docker build -t $ECR_REGISTRY/demo-frontend:${{ github.sha }} ./frontend
+          docker push $ECR_REGISTRY/demo-frontend:${{ github.sha }}
 
       - name: Build & Push Backend
         run: |
