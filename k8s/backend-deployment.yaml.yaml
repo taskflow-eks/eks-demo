@@ -13,6 +13,7 @@ spec:
       labels:
         app: demo-backend
     spec:
+      serviceAccountName: backend-sa
       containers:
         - name: demo-backend
           image: 515682373899.dkr.ecr.ap-northeast-2.amazonaws.com/demo-backend:latest
