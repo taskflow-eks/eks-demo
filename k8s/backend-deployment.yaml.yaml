@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: demo-backend
-          image: <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/demo-backend:latest
+          image: 515682373899.dkr.ecr.ap-northeast-2.amazonaws.com/demo-backend:latest
           ports:
             - containerPort: 5000
           env:
