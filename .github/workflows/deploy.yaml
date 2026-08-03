@@ -13,7 +13,7 @@ env:
   AWS_REGION: ap-northeast-2
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
   EKS_CLUSTER: eks-demo-cluster
-  K8S_NAMESPACE: demo          # TODO: k8s/namespace.yaml의 실제 이름으로
+  K8S_NAMESPACE: demo-eks
 
 jobs:
   test:
