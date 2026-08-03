@@ -143,7 +143,7 @@ variable "log_retention_days" {
 
 # --- GitHub Actions OIDC --------------------------------------------------
 
-variable "github_repository" {
-  type    = string
-  default = ""
+variable "github_repositories" {
+  type    = list(string)
+  default = []
 }

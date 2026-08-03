@@ -1,19 +1,22 @@
-name: Deploy EKS
+name: Deploy Frontend
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
-  id-token: write      # OIDC 토큰 발급용
+  id-token: write
   contents: read
 
 env:
   AWS_REGION: ap-northeast-2
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECR_REPOSITORY: taskflow-frontend
   EKS_CLUSTER: taskflow-cluster
   K8S_NAMESPACE: taskflow
+  DEPLOYMENT: taskflow-frontend
 
 jobs:
   test:
@@ -28,15 +31,13 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        working-directory: ./frontend
         run: npm install
 
       # 빌드가 깨지는 코드가 클러스터로 나가지 않도록 먼저 검증
       - name: Build check
-        working-directory: ./frontend
         run: npm run build
 
-  build:
+  deploy:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -50,49 +51,36 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & Push Frontend
+      - name: Build & Push image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
           push: true
-          tags: ${{ env.ECR_REGISTRY }}/taskflow-frontend:${{ github.sha }}
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
-
-      - name: Build & Push Backend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ env.ECR_REGISTRY }}/taskflow-backend:${{ github.sha }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
 
-      - name: Deploy to EKS
+      - name: Update image
         run: |
-          sed -i "s|:latest|:${{ github.sha }}|g" k8s/*.yaml
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/
+          kubectl set image deployment/$DEPLOYMENT \
+            $DEPLOYMENT=$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            -n $K8S_NAMESPACE
 
-      # apply는 접수만 확인하므로, 파드가 Ready가 될 때까지 기다린다
+      # set image는 요청만 보내므로, 파드가 Ready가 될 때까지 기다린다
       - name: Verify rollout
-        run: |
-          kubectl rollout status deployment/taskflow-frontend -n $K8S_NAMESPACE --timeout=180s
-          kubectl rollout status deployment/taskflow-backend  -n $K8S_NAMESPACE --timeout=180s
+        run: kubectl rollout status deployment/$DEPLOYMENT -n $K8S_NAMESPACE --timeout=180s
 
       - name: Show pod status on failure
         if: failure()
         run: |
           kubectl get pods -n $K8S_NAMESPACE -o wide
-          kubectl describe pods -n $K8S_NAMESPACE
-          kubectl logs -n $K8S_NAMESPACE --all-containers --tail=100 -l app=taskflow-backend || true
-          kubectl logs -n $K8S_NAMESPACE --all-containers --tail=100 -l app=taskflow-frontend || true
+          kubectl describe pods -n $K8S_NAMESPACE -l app=$DEPLOYMENT
+          kubectl logs -n $K8S_NAMESPACE --all-containers --tail=100 -l app=$DEPLOYMENT || true

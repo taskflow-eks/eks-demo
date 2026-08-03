@@ -13,5 +13,9 @@ bastion_key_name = ""
 # 장애 알림을 보낼 Discord 웹훅. 비워두면 SNS/Lambda/경보를 만들지 않음
 discord_webhook_url = ""
 
-# GitHub Actions OIDC를 쓸 레포지토리. 비워두면 OIDC 역할을 만들지 않음
-github_repository = "your-org/taskflow"
+# OIDC를 허용할 레포지토리 목록. 비워두면 OIDC 역할을 만들지 않음
+github_repositories = [
+  "your-org/taskflow-frontend",
+  "your-org/taskflow-backend",
+  "your-org/taskflow-infra",
+]

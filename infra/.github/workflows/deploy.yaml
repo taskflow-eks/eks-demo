@@ -1,0 +1,79 @@
+name: Apply Manifests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  EKS_CLUSTER: taskflow-cluster
+  K8S_NAMESPACE: taskflow
+
+jobs:
+  # Terraform 코드가 깨지지 않았는지 검사 (AWS 접속 없음)
+  terraform-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Format check
+        working-directory: ./terraform
+        run: terraform fmt -check -recursive
+
+      - name: Init
+        working-directory: ./terraform
+        run: terraform init -backend=false
+
+      - name: Validate
+        working-directory: ./terraform
+        run: terraform validate
+
+  apply-manifests:
+    if: github.event_name != 'pull_request'
+    needs: terraform-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/taskflow-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+
+      # 네임스페이스가 없는 상태에서 다른 리소스가 먼저 적용되지 않도록 순서를 분리
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/taskflow-frontend -n $K8S_NAMESPACE --timeout=180s
+          kubectl rollout status deployment/taskflow-backend  -n $K8S_NAMESPACE --timeout=180s
+
+      - name: Show pod status on failure
+        if: failure()
+        run: |
+          kubectl get pods -n $K8S_NAMESPACE -o wide
+          kubectl describe pods -n $K8S_NAMESPACE

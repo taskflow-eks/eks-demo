@@ -1,11 +1,11 @@
 ############################################
 # GitHub Actions OIDC
 #  - 장기 액세스 키 대신 실행 시점에 임시 자격증명을 발급받도록 구성
-#  - github_repository 변수가 비어 있으면 아무것도 생성하지 않음
+#  - frontend / backend / infra 세 레포가 같은 역할을 사용
 ############################################
 
 locals {
-  oidc_enabled = var.github_repository != ""
+  oidc_enabled = length(var.github_repositories) > 0
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -34,17 +34,19 @@ resource "aws_iam_role" "github_actions" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = [
+            for repo in var.github_repositories : "repo:${repo}:ref:refs/heads/main"
+          ]
         }
       }
     }]
   })
 }
 
-resource "aws_iam_role_policy" "github_actions_ecr" {
+resource "aws_iam_role_policy" "github_actions" {
   count = local.oidc_enabled ? 1 : 0
 
-  name = "${var.project_name}-github-actions-ecr"
+  name = "${var.project_name}-github-actions"
   role = aws_iam_role.github_actions[0].id
 
   policy = jsonencode({
