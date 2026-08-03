@@ -46,7 +46,7 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>EKS Demo — Task Manager</h1>
+      <h1 style={styles.title}>TaskFlow</h1>
 
       {info && (
         <div style={styles.info}>

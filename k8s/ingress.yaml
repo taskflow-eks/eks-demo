@@ -1,12 +1,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: demo-ingress
-  namespace: demo-eks
+  name: taskflow-ingress
+  namespace: taskflow
   annotations:
-    alb.ingress.kubernetes.io/load-balancer-name: demo-alb
+    alb.ingress.kubernetes.io/load-balancer-name: taskflow-alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
 spec:
   ingressClassName: alb
   rules:
@@ -16,6 +17,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: eks-demo-frontend-svc
+            name: taskflow-frontend-svc
             port:
               number: 80

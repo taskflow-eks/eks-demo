@@ -1,27 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-backend
-  namespace: demo-eks
+  name: taskflow-backend
+  namespace: taskflow
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: demo-backend
+      app: taskflow-backend
   template:
     metadata:
       labels:
-        app: demo-backend
+        app: taskflow-backend
     spec:
       serviceAccountName: backend-sa
+      # 두 AZ에 고르게 나누어 배치 (한쪽 AZ 장애 시에도 남은 파드가 요청 처리)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: taskflow-backend
       containers:
-        - name: demo-backend
-          image: 515682373899.dkr.ecr.ap-northeast-2.amazonaws.com/demo-backend:latest
+        - name: taskflow-backend
+          image: 515682373899.dkr.ecr.ap-northeast-2.amazonaws.com/taskflow-backend:latest
           ports:
             - containerPort: 5000
           env:
             - name: DB_SECRET_NAME
-              value: "eks-demo"
+              value: "taskflow-db"
             - name: AWS_REGION
               value: "ap-northeast-2"
           resources:

@@ -17,7 +17,7 @@ def get_db_credentials():
         return {
             "host":     os.getenv("DB_HOST", "localhost"),
             "port":     os.getenv("DB_PORT", "5432"),
-            "dbname":   os.getenv("DB_NAME", "eksdb"),
+            "dbname":   os.getenv("DB_NAME", "taskflowdb"),
             "username": os.getenv("DB_USER", "postgres"),
             "password": os.getenv("DB_PASSWORD", "password"),
         }
@@ -56,7 +56,7 @@ with app.app_context():
 @app.route("/")
 def index():
     return jsonify({
-        "message": "EKS Demo API",
+        "message": "TaskFlow API",
         "pod":     socket.gethostname(),
         "version": os.getenv("APP_VERSION", "1.0.0"),
         "time":    datetime.datetime.utcnow().isoformat() + "Z",

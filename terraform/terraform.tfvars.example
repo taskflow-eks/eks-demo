@@ -1,0 +1,17 @@
+# 이 파일을 terraform.tfvars 로 복사한 뒤 값을 채우세요.
+# terraform.tfvars 는 .gitignore에 포함되어 커밋되지 않습니다.
+
+aws_region   = "ap-northeast-2"
+project_name = "taskflow"
+
+# Bastion SSH 를 허용할 IP. 반드시 본인 IP로 좁힐 것
+allowed_ssh_cidr = "1.2.3.4/32"
+
+# 기존에 만들어 둔 EC2 키페어 이름 (없으면 빈 문자열 → SSM Session Manager로 접속)
+bastion_key_name = ""
+
+# 장애 알림을 보낼 Discord 웹훅. 비워두면 SNS/Lambda/경보를 만들지 않음
+discord_webhook_url = ""
+
+# GitHub Actions OIDC를 쓸 레포지토리. 비워두면 OIDC 역할을 만들지 않음
+github_repository = "your-org/taskflow"
