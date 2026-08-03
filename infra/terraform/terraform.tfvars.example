@@ -15,7 +15,7 @@ discord_webhook_url = ""
 
 # OIDC를 허용할 레포지토리 목록. 비워두면 OIDC 역할을 만들지 않음
 github_repositories = [
-  "your-org/taskflow-frontend",
-  "your-org/taskflow-backend",
-  "your-org/taskflow-infra",
+  "taskflow-eks/taskflow-frontend",
+  "taskflow-eks/taskflow-backend",
+  "taskflow-eks/taskflow-infra",
 ]
