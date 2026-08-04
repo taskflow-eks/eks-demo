@@ -77,16 +77,57 @@ terraform output application_url
 
 ## 삭제
 
+Ingress를 먼저 지우고 ALB가 완전히 사라진 것을 확인한 뒤 destroy 하는 것을 권장합니다.
+
+```bash
+kubectl delete ingress taskflow-ingress -n taskflow
+```
+
+```bash
+# ALB가 사라질 때까지 확인 (빈 결과가 나오면 완료)
+aws elbv2 describe-load-balancers --region ap-northeast-2 \
+  --query "LoadBalancers[?LoadBalancerName=='taskflow-alb'].State.Code" --output text
+```
+
 ```bash
 terraform destroy
 ```
 
-ALB는 Ingress가 만들지만 그 Ingress를 Terraform이 관리하므로,
-파괴 순서상 Ingress가 먼저 제거되어 ALB도 함께 정리됩니다.
 ECR 레포지토리는 `force_delete = true` 라 이미지가 남아 있어도 삭제됩니다.
 
 `destroy` 후 다시 세울 때는 **3번의 두 단계 apply부터 반복**하고,
 ECR 이미지도 사라지므로 **5번의 워크플로우 실행도 다시** 해야 합니다.
+
+### DependencyViolation 으로 실패했다면
+
+ALB가 남아 서브넷과 인터넷 게이트웨이 삭제를 막는 상황입니다.
+ALB는 Terraform이 아니라 AWS Load Balancer Controller가 만들기 때문에,
+컨트롤러가 Ingress보다 먼저 제거되면 finalizer를 해제할 주체가 사라져 ALB가 남습니다.
+
+```bash
+# 1. Ingress finalizer 제거
+kubectl patch ingress taskflow-ingress -n taskflow -p '{"metadata":{"finalizers":null}}' --type=merge
+
+# 2. ALB 삭제
+ALB_ARN=$(aws elbv2 describe-load-balancers --names taskflow-alb --region ap-northeast-2 \
+  --query "LoadBalancers[0].LoadBalancerArn" --output text)
+aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" --region ap-northeast-2
+
+# 3. ALB가 사라진 뒤 대상 그룹 삭제
+aws elbv2 describe-target-groups --region ap-northeast-2 \
+  --query "TargetGroups[?starts_with(TargetGroupName,'k8s-taskflow')].TargetGroupArn" --output text \
+  | xargs -n1 -I{} aws elbv2 delete-target-group --target-group-arn {} --region ap-northeast-2
+
+# 4. 재실행
+terraform destroy
+```
+
+VPC에 무엇이 남아 삭제를 막는지는 ENI 목록으로 확인할 수 있습니다.
+
+```bash
+aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=<VPC_ID>" \
+  --region ap-northeast-2 --query "NetworkInterfaces[].{Id:NetworkInterfaceId,Desc:Description}" --output table
+```
 
 ---
 

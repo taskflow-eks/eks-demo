@@ -146,9 +146,14 @@ module "k8s" {
   max_replicas   = var.app_max_replicas
   hpa_cpu_target = var.hpa_cpu_target
 
+  # lb_controller를 명시적으로 참조해 파괴 순서를 고정한다.
+  # Terraform은 의존하는 쪽을 먼저 파괴하므로 Ingress가 컨트롤러보다 먼저 제거된다.
+  # 컨트롤러가 먼저 사라지면 Ingress의 finalizer를 해제할 주체가 없어
+  # ALB가 남고, 그 ALB가 서브넷과 IGW 삭제를 막는다.
   depends_on = [
     time_sleep.wait_for_alb_webhook,
     module.metrics_server,
+    module.lb_controller,
   ]
 }
 
