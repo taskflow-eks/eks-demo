@@ -104,7 +104,7 @@ resource "kubernetes_deployment_v1" "backend" {
         topology_spread_constraint {
           max_skew           = 1
           topology_key       = "topology.kubernetes.io/zone"
-          when_unsatisfiable = "ScheduleAnyway"
+          when_unsatisfiable = var.topology_spread_policy
 
           label_selector {
             match_labels = { app = local.backend_name }
@@ -220,7 +220,7 @@ resource "kubernetes_deployment_v1" "frontend" {
         topology_spread_constraint {
           max_skew           = 1
           topology_key       = "topology.kubernetes.io/zone"
-          when_unsatisfiable = "ScheduleAnyway"
+          when_unsatisfiable = var.topology_spread_policy
 
           label_selector {
             match_labels = { app = local.frontend_name }

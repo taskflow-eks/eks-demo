@@ -74,6 +74,21 @@ variable "hpa_cpu_target" {
   default     = 60
 }
 
+variable "topology_spread_policy" {
+  description = <<-EOT
+    AZ 분산 제약을 만족하지 못할 때의 동작.
+    ScheduleAnyway 는 권장 사항이라 스케줄러의 다른 점수 요소에 밀려 한쪽 AZ로 몰릴 수 있다.
+    DoNotSchedule 은 분산을 강제하는 대신, 한쪽 AZ가 사라지면 대체 파드가 Pending 상태로 대기한다.
+  EOT
+  type        = string
+  default     = "DoNotSchedule"
+
+  validation {
+    condition     = contains(["DoNotSchedule", "ScheduleAnyway"], var.topology_spread_policy)
+    error_message = "DoNotSchedule 또는 ScheduleAnyway 만 사용할 수 있습니다."
+  }
+}
+
 variable "pre_stop_sleep_seconds" {
   description = "종료 신호를 받은 뒤 ALB가 대상에서 제거할 때까지 기다리는 시간(초)"
   type        = number

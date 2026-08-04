@@ -15,14 +15,23 @@ COLORS = {
 def build_embed(alarm: dict) -> dict:
     state = alarm.get("NewStateValue", "UNKNOWN")
 
+    # AlarmDescription은 경보 자체에 대한 설명이라 상태와 무관하게 고정된다.
+    # OK 상태에서 "ERROR가 감지되었습니다"가 그대로 나오면 오해를 주므로 상태별로 문구를 나눈다.
+    if state == "ALARM":
+        headline = alarm.get("AlarmDescription") or "임계값을 초과했습니다."
+    elif state == "OK":
+        headline = "지표가 임계값 아래로 돌아와 경보가 해제되었습니다."
+    else:
+        headline = "지표를 판단할 데이터가 부족합니다."
+
     return {
         "title": f"[{state}] {alarm.get('AlarmName', 'Unknown alarm')}",
         "description": alarm.get("NewStateReason", ""),
         "color": COLORS.get(state, 0x868E96),
         "fields": [
             {
-                "name": "설명",
-                "value": alarm.get("AlarmDescription") or "-",
+                "name": "상태" if state == "OK" else "감지 내용",
+                "value": headline,
                 "inline": False,
             },
             {
@@ -40,10 +49,15 @@ def build_embed(alarm: dict) -> dict:
 
 
 def post_to_discord(payload: dict) -> int:
+    # User-Agent를 지정하지 않으면 urllib 기본값(Python-urllib/x.y)이 전송되는데,
+    # Discord 앞단의 Cloudflare가 이를 차단해 403을 반환한다.
     request = urllib.request.Request(
         WEBHOOK_URL,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "taskflow-alerts/1.0 (+https://github.com/taskflow-eks)",
+        },
         method="POST",
     )
 
