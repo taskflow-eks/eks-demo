@@ -1,0 +1,8 @@
+# draw.io 자동 백업
+.$*.drawio.bkp
+*.drawio.bkp
+*.dtmp
+
+# OS
+Thumbs.db
+.DS_Store
