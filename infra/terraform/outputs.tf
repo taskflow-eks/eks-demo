@@ -13,6 +13,16 @@ output "ecr_registry" {
   value       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
 
+output "alb_dns_name" {
+  description = "Ingress가 만든 ALB 주소. 브라우저로 접속할 곳"
+  value       = module.k8s.alb_dns_name
+}
+
+output "application_url" {
+  description = "서비스 접속 URL"
+  value       = module.k8s.alb_dns_name != null ? "http://${module.k8s.alb_dns_name}" : null
+}
+
 # --- 아래 출력값은 main.tf에서 해당 모듈의 주석을 해제한 뒤 함께 활성화할 것 -----
 
 # output "ecr_repository_urls" {

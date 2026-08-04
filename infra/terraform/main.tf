@@ -79,21 +79,6 @@ module "bastion" {
 }
 
 ############################################################
-# 애플리케이션 네임스페이스 · IRSA
-############################################################
-
-module "k8s" {
-  source = "./k8s"
-
-  project_name            = var.project_name
-  namespace               = var.k8s_namespace
-  backend_service_account = var.backend_service_account
-
-  oidc_provider_arn = module.eks.oidc_provider_arn
-  db_secret_arn     = module.rds.secret_arn
-}
-
-############################################################
 # 클러스터 애드온
 ############################################################
 
@@ -117,6 +102,13 @@ module "fluentbit" {
   log_retention_days = var.log_retention_days
 }
 
+# HPA가 CPU 사용률을 읽으려면 metrics.k8s.io API가 필요하다
+module "metrics_server" {
+  source = "./metrics_server"
+
+  depends_on = [module.eks]
+}
+
 # ALB Controller가 설치되면 Service 생성 요청이 웹훅을 거치게 된다.
 # 이때 웹훅 인증서의 유효 시작 시각이 수십 초 뒤로 잡혀 있어,
 # 바로 Service를 만들면 "certificate ... is not yet valid" 로 거부된다.
@@ -125,6 +117,36 @@ resource "time_sleep" "wait_for_alb_webhook" {
   depends_on = [module.lb_controller]
 
   create_duration = "90s"
+}
+
+############################################################
+# 애플리케이션 워크로드
+#  Ingress가 만들어지면 ALB Controller가 ALB를 생성한다.
+#  Service·Ingress 생성 요청은 컨트롤러의 웹훅을 거치므로
+#  웹훅이 준비된 뒤에 적용해야 한다.
+############################################################
+
+module "k8s" {
+  source = "./k8s"
+
+  project_name            = var.project_name
+  namespace               = var.k8s_namespace
+  backend_service_account = var.backend_service_account
+  aws_region              = var.aws_region
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  db_secret_arn     = module.rds.secret_arn
+  db_secret_name    = var.db_secret_name
+
+  ecr_registry   = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+  replicas       = var.app_replicas
+  max_replicas   = var.app_max_replicas
+  hpa_cpu_target = var.hpa_cpu_target
+
+  depends_on = [
+    time_sleep.wait_for_alb_webhook,
+    module.metrics_server,
+  ]
 }
 
 module "kube_prometheus" {

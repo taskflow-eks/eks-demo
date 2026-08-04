@@ -10,6 +10,10 @@ resource "aws_ecr_repository" "this" {
   name                 = each.value
   image_tag_mutability = "MUTABLE"
 
+  # 이미지가 남아 있으면 레포지토리 삭제가 실패하므로,
+  # 실습 환경에서는 함께 삭제되도록 허용한다
+  force_delete = var.force_delete
+
   image_scanning_configuration {
     scan_on_push = true
   }

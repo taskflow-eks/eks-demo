@@ -15,6 +15,19 @@ resource "aws_iam_openid_connect_provider" "this" {
   thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
+locals {
+  # 조직 설정에 따라 sub 클레임에 조직/레포의 숫자 ID가 붙는다.
+  #   기본형: repo:<org>/<repo>:ref:refs/heads/main
+  #   ID 포함: repo:<org>@<orgId>/<repo>@<repoId>:ref:refs/heads/main
+  # 두 형식을 모두 허용하되 조직·레포·브랜치는 정확히 고정한다.
+  allowed_subs = flatten([
+    for repo in var.repositories : [
+      "repo:${repo}:ref:refs/heads/${var.allowed_branch}",
+      "repo:${split("/", repo)[0]}@*/${split("/", repo)[1]}@*:ref:refs/heads/${var.allowed_branch}",
+    ]
+  ])
+}
+
 resource "aws_iam_role" "this" {
   name = "${var.project_name}-github-actions"
 
@@ -31,9 +44,7 @@ resource "aws_iam_role" "this" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = [
-            for repo in var.repositories : "repo:${repo}:ref:refs/heads/${var.allowed_branch}"
-          ]
+          "token.actions.githubusercontent.com:sub" = local.allowed_subs
         }
       }
     }]

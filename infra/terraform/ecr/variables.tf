@@ -8,3 +8,9 @@ variable "keep_image_count" {
   type        = number
   default     = 10
 }
+
+variable "force_delete" {
+  description = "이미지가 남아 있어도 레포지토리를 삭제할지 여부. 운영 환경에서는 false 권장"
+  type        = bool
+  default     = true
+}

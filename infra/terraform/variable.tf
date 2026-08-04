@@ -86,9 +86,32 @@ variable "k8s_namespace" {
 }
 
 variable "backend_service_account" {
-  description = "백엔드 서비스 어카운트 이름. backend-deployment.yaml과 일치해야 함"
+  description = "백엔드 서비스 어카운트 이름"
   type        = string
   default     = "backend-sa"
+}
+
+variable "app_replicas" {
+  description = "프론트엔드 / 백엔드 각각의 파드 수. AZ 분산을 위해 2 이상"
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.app_replicas >= 2
+    error_message = "한쪽 AZ 장애에도 서비스가 유지되려면 replica가 2개 이상이어야 합니다."
+  }
+}
+
+variable "app_max_replicas" {
+  description = "HPA가 확장할 수 있는 최대 파드 수"
+  type        = number
+  default     = 6
+}
+
+variable "hpa_cpu_target" {
+  description = "HPA가 유지하려는 평균 CPU 사용률(%)"
+  type        = number
+  default     = 60
 }
 
 # --- ECR --------------------------------------------------------------------
