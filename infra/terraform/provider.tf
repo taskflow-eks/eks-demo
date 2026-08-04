@@ -22,6 +22,14 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.11"
+    }
   }
 }
 
@@ -34,11 +42,6 @@ provider "aws" {
       ManagedBy = "terraform"
     }
   }
-}
-
-# EKS 클러스터 인증 정보 (kubernetes / helm 프로바이더에서 사용)
-data "aws_eks_cluster_auth" "this" {
-  name = module.eks.cluster_name
 }
 
 provider "kubernetes" {
@@ -54,5 +57,3 @@ provider "helm" {
     token                  = data.aws_eks_cluster_auth.this.token
   }
 }
-
-data "aws_caller_identity" "current" {}

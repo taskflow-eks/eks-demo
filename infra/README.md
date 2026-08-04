@@ -88,11 +88,11 @@ flowchart TB
 
 | 영역 | 사용 기술 |
 |---|---|
-| 오케스트레이션 | Amazon EKS v1.30 (관리형 노드 그룹, t3.medium × 2) |
+| 오케스트레이션 | Amazon EKS v1.36 (관리형 노드 그룹, AL2023, t3.medium × 2) |
 | IaC | Terraform (`terraform-aws-modules` vpc / eks / iam) |
 | 네트워크 | VPC, 퍼블릭·프라이빗 서브넷 (2 AZ), NAT Gateway, IGW |
 | 외부 노출 | ALB (AWS Load Balancer Controller, Ingress) |
-| 데이터베이스 | RDS PostgreSQL 16 (프라이빗 서브넷) |
+| 데이터베이스 | RDS PostgreSQL 17 (프라이빗 서브넷) |
 | 이미지 | ECR (스캔 활성화, 최근 10개 유지) |
 | 로그 | Fluent Bit → CloudWatch Logs |
 | 지표 | kube-prometheus-stack (Prometheus + Grafana) |

@@ -1,24 +1,21 @@
-############################################
+############################################################
 # GitHub Actions OIDC
 #  - 장기 액세스 키 대신 실행 시점에 임시 자격증명을 발급받도록 구성
-#  - frontend / backend / infra 세 레포가 같은 역할을 사용
-############################################
+#  - 지정한 레포지토리의 지정한 브랜치에서 실행될 때만 역할을 맡을 수 있음
+############################################################
 
-locals {
-  oidc_enabled = length(var.github_repositories) > 0
+# 공급자 인증서 지문을 하드코딩하지 않고 실제 엔드포인트에서 조회
+data "tls_certificate" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
-resource "aws_iam_openid_connect_provider" "github" {
-  count = local.oidc_enabled ? 1 : 0
-
+resource "aws_iam_openid_connect_provider" "this" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
-resource "aws_iam_role" "github_actions" {
-  count = local.oidc_enabled ? 1 : 0
-
+resource "aws_iam_role" "this" {
   name = "${var.project_name}-github-actions"
 
   assume_role_policy = jsonencode({
@@ -26,7 +23,7 @@ resource "aws_iam_role" "github_actions" {
     Statement = [{
       Effect = "Allow"
       Principal = {
-        Federated = aws_iam_openid_connect_provider.github[0].arn
+        Federated = aws_iam_openid_connect_provider.this.arn
       }
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
@@ -35,7 +32,7 @@ resource "aws_iam_role" "github_actions" {
         }
         StringLike = {
           "token.actions.githubusercontent.com:sub" = [
-            for repo in var.github_repositories : "repo:${repo}:ref:refs/heads/main"
+            for repo in var.repositories : "repo:${repo}:ref:refs/heads/${var.allowed_branch}"
           ]
         }
       }
@@ -43,11 +40,9 @@ resource "aws_iam_role" "github_actions" {
   })
 }
 
-resource "aws_iam_role_policy" "github_actions" {
-  count = local.oidc_enabled ? 1 : 0
-
+resource "aws_iam_role_policy" "this" {
   name = "${var.project_name}-github-actions"
-  role = aws_iam_role.github_actions[0].id
+  role = aws_iam_role.this.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -68,36 +63,32 @@ resource "aws_iam_role_policy" "github_actions" {
           "ecr:BatchGetImage",
           "ecr:GetDownloadUrlForLayer",
         ]
-        Resource = [for repo in aws_ecr_repository.this : repo.arn]
+        Resource = var.ecr_repository_arns
       },
       {
         Effect   = "Allow"
         Action   = "eks:DescribeCluster"
-        Resource = module.eks.cluster_arn
+        Resource = var.cluster_arn
       },
     ]
   })
 }
 
 # 이 역할이 kubectl을 쓸 수 있도록 EKS 접근 권한 등록
-resource "aws_eks_access_entry" "github_actions" {
-  count = local.oidc_enabled ? 1 : 0
-
-  cluster_name  = module.eks.cluster_name
-  principal_arn = aws_iam_role.github_actions[0].arn
+resource "aws_eks_access_entry" "this" {
+  cluster_name  = var.cluster_name
+  principal_arn = aws_iam_role.this.arn
   type          = "STANDARD"
 }
 
-resource "aws_eks_access_policy_association" "github_actions" {
-  count = local.oidc_enabled ? 1 : 0
-
-  cluster_name  = module.eks.cluster_name
-  principal_arn = aws_iam_role.github_actions[0].arn
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+resource "aws_eks_access_policy_association" "this" {
+  cluster_name  = var.cluster_name
+  principal_arn = aws_iam_role.this.arn
+  policy_arn    = var.eks_access_policy_arn
 
   access_scope {
     type = "cluster"
   }
 
-  depends_on = [aws_eks_access_entry.github_actions]
+  depends_on = [aws_eks_access_entry.this]
 }

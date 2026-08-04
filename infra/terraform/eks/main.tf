@@ -1,18 +1,18 @@
-############################################
+############################################################
 # EKS 클러스터
 #  - 워커 노드는 프라이빗 서브넷에 배치하고 두 AZ에 분산
 #  - 컨트롤 플레인 엔드포인트는 퍼블릭으로 열어 GitHub Actions에서 kubectl 접근
-############################################
+############################################################
 
-module "eks" {
+module "this" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.24"
 
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = var.vpc_id
+  subnet_ids = var.subnet_ids
 
   cluster_endpoint_public_access = true
 
@@ -30,6 +30,9 @@ module "eks" {
     default = {
       name = "${var.project_name}-ng"
 
+      # 1.33 이후로 Amazon Linux 2 AMI는 지원되지 않으므로 AL2023을 명시
+      ami_type = "AL2023_x86_64_STANDARD"
+
       instance_types = var.node_instance_types
       capacity_type  = "ON_DEMAND"
 
@@ -38,34 +41,10 @@ module "eks" {
       desired_size = var.node_desired_size
 
       # 여러 AZ에 걸쳐 노드를 배치 → 파드가 서로 다른 AZ에 분산됨
-      subnet_ids = module.vpc.private_subnets
+      subnet_ids = var.subnet_ids
     }
   }
 
-  # 클러스터 컨트롤 플레인 로그 (CloudWatch)
-  cluster_enabled_log_types              = ["api", "audit", "authenticator"]
+  cluster_enabled_log_types              = var.cluster_enabled_log_types
   cloudwatch_log_group_retention_in_days = var.log_retention_days
-}
-
-# 애플리케이션 네임스페이스
-# (k8s/namespace.yaml과 중복이지만, IRSA 서비스 어카운트를 만들려면 먼저 존재해야 함)
-resource "kubernetes_namespace_v1" "app" {
-  metadata {
-    name = var.k8s_namespace
-  }
-
-  depends_on = [module.eks]
-}
-
-# 백엔드용 서비스 어카운트
-# app.py가 Secrets Manager에서 DB 자격증명을 읽으므로 IRSA로 권한을 부여
-resource "kubernetes_service_account_v1" "backend" {
-  metadata {
-    name      = var.backend_service_account
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-
-    annotations = {
-      "eks.amazonaws.com/role-arn" = module.backend_irsa.iam_role_arn
-    }
-  }
 }
