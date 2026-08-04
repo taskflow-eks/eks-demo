@@ -73,3 +73,21 @@ variable "hpa_cpu_target" {
   type        = number
   default     = 60
 }
+
+variable "pre_stop_sleep_seconds" {
+  description = "종료 신호를 받은 뒤 ALB가 대상에서 제거할 때까지 기다리는 시간(초)"
+  type        = number
+  default     = 15
+}
+
+variable "termination_grace_seconds" {
+  description = "파드 강제 종료까지의 유예 시간(초). preStop 대기 시간보다 커야 함"
+  type        = number
+  default     = 45
+}
+
+variable "deregistration_delay_seconds" {
+  description = "ALB 대상 그룹 등록 해제 대기 시간(초). 기본값 300은 롤링 업데이트에 너무 김"
+  type        = number
+  default     = 30
+}

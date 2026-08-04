@@ -13,6 +13,14 @@ locals {
 resource "kubernetes_namespace_v1" "this" {
   metadata {
     name = var.namespace
+
+    # Pod Readiness Gate
+    # 파드가 Ready 조건을 만족해도, ALB 대상 그룹에 등록되어 헬스체크를 통과하기
+    # 전까지는 Ready로 취급하지 않는다. 이 라벨이 없으면 롤링 업데이트 중
+    # 새 파드가 아직 ALB에 등록되지 않은 상태에서 옛 파드가 제거되어 502가 발생한다.
+    labels = {
+      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
+    }
   }
 }
 
@@ -89,6 +97,9 @@ resource "kubernetes_deployment_v1" "backend" {
       spec {
         service_account_name = kubernetes_service_account_v1.backend.metadata[0].name
 
+        # preStop 대기(아래)가 끝날 때까지 강제 종료되지 않도록 여유를 둔다
+        termination_grace_period_seconds = var.termination_grace_seconds
+
         # 파드를 두 가용영역에 고르게 배치해 한쪽 AZ 장애에도 요청 처리가 이어지도록 함
         topology_spread_constraint {
           max_skew           = 1
@@ -139,6 +150,17 @@ resource "kubernetes_deployment_v1" "backend" {
             }
             initial_delay_seconds = 5
             period_seconds        = 10
+          }
+
+          # 종료 신호를 받은 뒤에도 잠시 요청을 계속 받는다.
+          # ALB가 이 파드를 대상 그룹에서 제거하는 데 시간이 걸리므로,
+          # 곧바로 죽으면 그 사이 들어온 요청이 502가 된다.
+          lifecycle {
+            pre_stop {
+              exec {
+                command = ["/bin/sh", "-c", "sleep ${var.pre_stop_sleep_seconds}"]
+              }
+            }
           }
         }
       }
@@ -193,6 +215,8 @@ resource "kubernetes_deployment_v1" "frontend" {
       }
 
       spec {
+        termination_grace_period_seconds = var.termination_grace_seconds
+
         topology_spread_constraint {
           max_skew           = 1
           topology_key       = "topology.kubernetes.io/zone"
@@ -232,6 +256,15 @@ resource "kubernetes_deployment_v1" "frontend" {
             }
             initial_delay_seconds = 5
             period_seconds        = 10
+          }
+
+          # ALB가 대상 그룹에서 제거할 시간을 벌어준 뒤 Nginx를 정상 종료한다
+          lifecycle {
+            pre_stop {
+              exec {
+                command = ["/bin/sh", "-c", "sleep ${var.pre_stop_sleep_seconds}; nginx -s quit"]
+              }
+            }
           }
         }
       }
@@ -274,6 +307,13 @@ resource "kubernetes_ingress_v1" "this" {
       "alb.ingress.kubernetes.io/scheme"             = "internet-facing"
       "alb.ingress.kubernetes.io/target-type"        = "ip"
       "alb.ingress.kubernetes.io/healthcheck-path"   = "/"
+
+      # 헬스체크를 촘촘히 해 새 파드가 빨리 정상으로 인식되도록 한다
+      "alb.ingress.kubernetes.io/healthcheck-interval-seconds" = "10"
+      "alb.ingress.kubernetes.io/healthy-threshold-count"      = "2"
+
+      # 등록 해제 대기는 기본 300초. preStop 대기 시간에 맞춰 줄인다
+      "alb.ingress.kubernetes.io/target-group-attributes" = "deregistration_delay.timeout_seconds=${var.deregistration_delay_seconds}"
     }
   }
 
