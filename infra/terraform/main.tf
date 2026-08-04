@@ -1,5 +1,8 @@
 locals {
-  notification_enabled = var.discord_webhook_url != ""
+  # 웹훅 값 자체는 민감하지만 "설정되었는지" 여부는 민감하지 않다.
+  # nonsensitive로 감싸지 않으면 이 local을 참조하는 출력값까지 민감 처리되어
+  # "Output refers to sensitive values" 오류가 발생한다.
+  notification_enabled = nonsensitive(var.discord_webhook_url != "")
   oidc_enabled         = length(var.github_repositories) > 0
 }
 
